@@ -1,5 +1,6 @@
 from .bitops import *
 from .entropy import *
+from .layerutils import *
 from .psnr import *
 from .softargmax import *
 

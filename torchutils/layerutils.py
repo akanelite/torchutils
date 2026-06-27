@@ -12,10 +12,14 @@ __all__ = ["IntermediateLayerGetter"]
 
 # Helper Functions
 
-def reduced_getattr(obj: Any, attr: str, *args: Any):
-    def func(_obj, _attr):
-        return getattr(_obj, _attr, *args)
-    return functools.reduce(func, [obj] + attr.split("."))
+def reduced_getattr(obj: Any, attr: str) -> Any:
+    """Resolve a dotted attribute path (e.g. ``"block.conv"``) on ``obj``.
+
+    Raises ``AttributeError`` if any segment is missing.
+    """
+    for name in attr.split("."):
+        obj = getattr(obj, name)
+    return obj
 
 
 # Modules
@@ -31,29 +35,27 @@ class IntermediateLayerGetter(nn.Module):
         features = OrderedDict()
         handlers = []
 
-        for name, label in self.return_layers.items():
-            layer = reduced_getattr(self._model, name)
-
-            # noinspection PyUnusedLocal
-            def hook(m, i, o, n):
-                if n in features:
-                    if isinstance(features[n], list):
-                        features[n].append(o)
-                    else:
-                        features[n] = [features[n], o]
+        def hook(module, inputs, output, label):
+            if label in features:
+                if isinstance(features[label], list):
+                    features[label].append(output)
                 else:
-                    features[n] = o
+                    features[label] = [features[label], output]
+            else:
+                features[label] = output
 
+        for name, label in self.return_layers.items():
             try:
-                handler = layer.register_forward_hook(functools.partial(hook, n=label))
+                layer = reduced_getattr(self._model, name)
             except AttributeError:
-                raise AttributeError(f"{name} not found")
+                raise AttributeError(f"return layer {name!r} not found in model") from None
 
-            handlers.append(handler)
+            handlers.append(layer.register_forward_hook(functools.partial(hook, label=label)))
 
-        self._model(*args, **kwargs)
-
-        for handler in handlers:
-            handler.remove()
+        try:
+            self._model(*args, **kwargs)
+        finally:
+            for handler in handlers:
+                handler.remove()
 
         return features
