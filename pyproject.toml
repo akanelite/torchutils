@@ -1,0 +1,26 @@
+[project]
+name = "torchutils"
+description = "A small collection of PyTorch utility functions and modules."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dynamic = ["version"]
+dependencies = [
+    "numpy>=2.2.6",
+    "torch>=2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "torchutils/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["torchutils"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
