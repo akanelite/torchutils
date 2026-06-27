@@ -1,5 +1,3 @@
-import math
-
 import torch
 
 from .common_types import *
@@ -8,44 +6,40 @@ from .common_types import *
 __all__ = ["psnr"]
 
 
-# Checking
-
-def _is_float32_tensor(x: Tensor) -> bool:
-    return x.dtype == torch.float32
-
-
 # Functional
 
-def psnr(x: Tensor, other: Tensor, max_v: float = 255) -> Tensor:
-    """Compute the Peak Signal-to-Noise Ratio (PSNR) between two tensors.
+def psnr(x: Tensor, other: Tensor, max_v: float | None = None) -> Tensor:
+    """Compute the Peak Signal-to-Noise Ratio (PSNR) between two images.
 
-    PSNR is a widely used metric for measuring the similarity between two images
-    or signals. Higher values indicate better quality (lower distortion).
-
-    Note:
-        If the mean squared error (MSE) is zero, indicating identical inputs,
-        the function returns `float('inf')`.
+    Higher values indicate better quality (lower distortion). Identical inputs
+    yield ``inf`` (computed per sample for batched inputs).
 
     Args:
-        x (Tensor): The input tensor (e.g., predicted image).
-        other (Tensor): The reference tensor (e.g., ground truth image).
-        max_v (float, optional): The maximum possible signal value. Default is 255.
+        x (Tensor): The input image(s), shaped ``[C, H, W]`` or ``[B, C, H, W]``.
+        other (Tensor): The reference image(s), same shape as ``x``.
+        max_v (float, optional): The maximum possible signal value. When omitted
+            it is inferred from ``x``'s dtype: ``1.0`` for floating point
+            (assumed normalized to ``[0, 1]``) and the dtype maximum for
+            integers (e.g. ``255`` for ``uint8``, ``65535`` for ``uint16``).
 
     Returns:
-        Tensor: A scalar tensor containing the PSNR value in decibels (dB).
+        Tensor: PSNR in decibels (dB). A scalar for a single ``[C, H, W]`` image,
+        or a ``[B]`` tensor of per-sample values for a ``[B, C, H, W]`` batch.
     """
     if x.shape != other.shape:
         raise RuntimeError(f"Shape of {x.shape} does not match {other.shape}")
 
-    if not _is_float32_tensor(x):
-        x = x.to(torch.float32)
+    if x.ndim not in (3, 4):
+        raise RuntimeError(f"psnr expects [C, H, W] or [B, C, H, W], got {x.ndim}D")
 
-    if not _is_float32_tensor(other):
-        other = other.to(torch.float32)
+    if max_v is None:
+        max_v = 1.0 if x.dtype.is_floating_point else torch.iinfo(x.dtype).max
 
-    mse = torch.mean((x - other) ** 2)
+    x = x.to(torch.float32)
+    other = other.to(torch.float32)
 
-    if mse == 0:
-        return torch.tensor(float("inf"), device=x.device)
+    se = (x - other) ** 2
+    mse = se.mean(dim=(1, 2, 3)) if x.ndim == 4 else se.mean()
 
-    return 20 * math.log10(max_v) - 10 * torch.log10(mse)
+    # 10 * log10(max_v ** 2 / mse); identical inputs (mse == 0) give +inf.
+    return mse.reciprocal().mul(max_v ** 2).log10().mul(10)
