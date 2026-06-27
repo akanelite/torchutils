@@ -17,6 +17,8 @@ def _is_uint8_tensor(x: Tensor) -> bool:
 def shannons(x: Tensor) -> Tensor:
     if not _is_uint8_tensor(x):
         raise TypeError("shannons only supports uint8 tensors")
+    if x.numel() == 0:
+        raise ValueError("shannons requires a non-empty tensor")
     counts = torch.bincount(x.ravel())
-    p = counts[0 < counts].to(torch.float32) / x.numel()
-    return -1 * torch.sum(torch.log2(p) * p)
+    p = counts[counts > 0].to(torch.float32) / x.numel()
+    return torch.sum(-p * torch.log2(p)).clamp_min(0.0)
