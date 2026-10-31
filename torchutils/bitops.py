@@ -36,6 +36,16 @@ def i8u8(x: Tensor) -> Tensor:
 
     Returns:
         Tensor: A tensor of dtype torch.uint8, each element offset by +128.
+
+    Raises:
+        TypeError: If ``x`` is not an int8 tensor.
+
+    Example:
+        >>> x = torch.tensor([-128, -1, 0, 127], dtype=torch.int8)
+        >>> i8u8(x)
+        tensor([  0, 127, 128, 255], dtype=torch.uint8)
+        >>> torch.equal(u8i8(i8u8(x)), x)
+        True
     """
     if not _is_int8_tensor(x):
         raise TypeError("i8u8 only supports int8 tensors")
@@ -58,6 +68,14 @@ def u8i8(x: Tensor) -> Tensor:
 
     Returns:
         Tensor: A tensor of dtype torch.int8, each element offset by -128.
+
+    Raises:
+        TypeError: If ``x`` is not a uint8 tensor.
+
+    Example:
+        >>> x = torch.tensor([0, 127, 128, 255], dtype=torch.uint8)
+        >>> u8i8(x)
+        tensor([-128,   -1,    0,  127], dtype=torch.int8)
     """
     if not _is_uint8_tensor(x):
         raise TypeError("u8i8 only supports uint8 tensors")

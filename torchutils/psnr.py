@@ -25,6 +25,17 @@ def psnr(x: Tensor, other: Tensor, max_v: float | None = None) -> Tensor:
     Returns:
         Tensor: PSNR in decibels (dB). A scalar for a single ``[C, H, W]`` image,
         or a ``[B]`` tensor of per-sample values for a ``[B, C, H, W]`` batch.
+
+    Raises:
+        RuntimeError: If the shapes differ or the input is not 3D or 4D.
+
+    Example:
+        >>> x = torch.zeros(3, 8, 8, dtype=torch.uint8)
+        >>> psnr(x, x + 1)  # max_v inferred as 255 from uint8
+        tensor(48.1308)
+        >>> batch = torch.rand(4, 3, 8, 8)
+        >>> psnr(batch, batch.clone())
+        tensor([inf, inf, inf, inf])
     """
     if x.shape != other.shape:
         raise RuntimeError(f"Shape of {x.shape} does not match {other.shape}")
