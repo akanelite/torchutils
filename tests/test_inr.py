@@ -50,3 +50,21 @@ def test_model_backward():
 def test_exported_from_package():
     for name in ["poly_inr_coord_sampler", "poly_inr_s", "poly_inr_l"]:
         assert hasattr(torchutils, name)
+
+
+# The shared affine projection is a buffer: it moves with the module and is saved.
+
+def test_affine_in_state_dict_and_restored():
+    src = poly_inr_s(dim=16, levels=2)
+    dst = poly_inr_s(dim=16, levels=2)
+    assert "affine" in src.state_dict()
+    dst.load_state_dict(src.state_dict())
+    x = poly_inr_coord_sampler((4, 4))
+    assert torch.equal(src(x), dst(x))
+
+
+def test_affine_follows_to():
+    model = poly_inr_s(dim=16, levels=2).to(torch.float64)
+    assert model.affine.dtype == torch.float64
+    out = model(poly_inr_coord_sampler((4, 4), dtype=torch.float64))
+    assert out.dtype == torch.float64

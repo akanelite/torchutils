@@ -24,15 +24,14 @@ def poly_inr_coord_sampler(size: tuple[int, int], device=None, dtype=None) -> Te
 
 class PINRBlock(nn.Module):
 
-    def __init__(self, dim: int, affine: Tensor, device=None, dtype=None) -> None:
+    def __init__(self, dim: int, device=None, dtype=None) -> None:
         factory_kwargs = dict(device=device, dtype=dtype)
         super().__init__()
-        self.affine = affine
         self.linear = nn.Linear(dim, dim, **factory_kwargs)
         self.activation = nn.LeakyReLU(0.2)
 
-    def forward(self, x: Tensor, r: Tensor | None = None) -> Tensor:
-        x = x @ self.affine.T
+    def forward(self, x: Tensor, affine: Tensor, r: Tensor | None = None) -> Tensor:
+        x = x @ affine.T
         if r is not None:
             x = x * r
         x = self.linear(x)
@@ -45,16 +44,18 @@ class PINR(nn.Module):
     def __init__(self, dim: int, levels: int = 10, device=None, dtype=None) -> None:
         factory_kwargs = dict(device=device, dtype=dtype)
         super().__init__()
-        self.affine = torch.zeros(dim, 3, **factory_kwargs).normal_()
+        # Fixed random projection shared by every block. Registered as a buffer so it
+        # follows .to() / .cuda() and is saved in the state_dict.
+        self.register_buffer("affine", torch.zeros(dim, 3, **factory_kwargs).normal_())
         self.layers = nn.ModuleList()
         for _ in range(levels):
-            self.layers.append(PINRBlock(dim, self.affine, **factory_kwargs))
+            self.layers.append(PINRBlock(dim, **factory_kwargs))
         self.head = nn.Sequential(nn.Linear(dim, 3, **factory_kwargs), nn.Sigmoid())
 
     def forward(self, x: Tensor) -> Tensor:
-        r = self.layers[0](x)
+        r = self.layers[0](x, self.affine)
         for layer in self.layers[1:]:
-            r = layer(x, r)
+            r = layer(x, self.affine, r)
         x = self.head(r)
         return x
 
