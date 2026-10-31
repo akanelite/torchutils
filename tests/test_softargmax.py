@@ -72,7 +72,9 @@ def test_non_contiguous_input():
 
 def test_gradient_flows():
     x = torch.randn(2, 3, 8, 8, requires_grad=True)
-    softargmax2d(x).sum().backward()
+    # A small beta keeps the softmax away from saturation; with the default
+    # 1e3 it can collapse to one-hot and the gradient underflows to exactly 0.
+    softargmax2d(x, beta=1.0).sum().backward()
     assert x.grad is not None
     assert x.grad.abs().sum() > 0
 
